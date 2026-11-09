@@ -2,6 +2,31 @@
 
 Logística Dinâmica de Resgate de Perecíveis (Combate à Fome)
 
+## Como rodar
+
+Pré-requisitos: Java 21+ e Docker.
+
+```bash
+cd backend
+./mvnw spring-boot:run   # sobe o Postgres do compose.yaml automaticamente (perfil dev)
+./mvnw verify            # testes (usam H2 em memória, sem Docker)
+```
+
+Rodando pelo IntelliJ: na run configuration, defina **Working directory** como `$MODULE_WORKING_DIR$`
+(pasta `backend/`), senão o Spring não encontra o `compose.yaml`.
+
+Usuário admin de desenvolvimento: `admin@resgatai.local` / `admin12345`.
+
+| Endpoint | Acesso | Descrição |
+|---|---|---|
+| `POST /auth/registro` | público | Cadastro de Estabelecimento ou Instituição (instituição entra como `PENDENTE`) |
+| `POST /auth/login` | público | Retorna `{ "token": "<JWT>" }` |
+| `GET /auth/me` | autenticado | Dados do usuário logado (`Authorization: Bearer <JWT>`) |
+| `GET /actuator/health` | público | Health check |
+
+Em produção defina `SPRING_PROFILES_ACTIVE=prod`, `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`,
+`SPRING_DATASOURCE_PASSWORD`, `JWT_SECRET` (mínimo 32 caracteres), `ADMIN_EMAIL` e `ADMIN_SENHA`.
+
 Os Atores do Sistema
 O Doador (Mercado/Padaria): O usuário que tem o alimento. Ele não tem tempo. Se o processo de doação exigir mais do que três cliques, ele desiste e joga a comida fora.
 

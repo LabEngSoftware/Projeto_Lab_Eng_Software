@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: resgatai
+  profiles:
+    default: dev
+  docker:
+    compose:
+      enabled: false
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+# Em produção (AWS) estes valores vêm de variáveis de ambiente, junto com
+# SPRING_DATASOURCE_URL, SPRING_DATASOURCE_USERNAME e SPRING_DATASOURCE_PASSWORD.
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiracao: 8h
+  admin:
+    email: ${ADMIN_EMAIL}
+    senha: ${ADMIN_SENHA}
