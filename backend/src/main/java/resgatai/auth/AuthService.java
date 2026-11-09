@@ -1,9 +1,5 @@
 package resgatai.auth;
 
-import resgatai.usuario.Estabelecimento;
-import resgatai.usuario.Instituicao;
-import resgatai.usuario.Usuario;
-import resgatai.usuario.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -12,6 +8,9 @@ import org.springframework.security.oauth2.jwt.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import resgatai.usuario.Usuario;
+import resgatai.usuario.UsuarioRepository;
+import resgatai.usuario.UsuarioService;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -23,6 +22,7 @@ import static org.springframework.http.HttpStatus.*;
 public class AuthService {
 
     private final UsuarioRepository usuarios;
+    private final UsuarioService usuarioService;
     private final PasswordEncoder encoder;
     private final JwtEncoder jwtEncoder;
 
@@ -31,36 +31,24 @@ public class AuthService {
 
     @Transactional
     public Usuario registrar(AuthController.RegistroRequest req) {
-        String email = req.email().trim().toLowerCase();
-        String documento = req.documento().replaceAll("\\D", "");
-        if (usuarios.existsByEmail(email) || usuarios.existsByDocumento(documento)) {
-            throw new ResponseStatusException(CONFLICT, "Já existe um usuário com este e-mail ou CNPJ");
+        if (req.perfil() == Usuario.Perfil.ADMIN) {
+            throw new ResponseStatusException(BAD_REQUEST, "Perfil não permitido no auto cadastro");
         }
-
-        Usuario u = switch (req.perfil()) {
-            case ESTABELECIMENTO -> new Estabelecimento();
-            case INSTITUICAO -> new Instituicao();
-            case ADMIN -> throw new ResponseStatusException(BAD_REQUEST, "Perfil não permitido no auto cadastro");
-        };
-        u.setNome(req.nome().trim());
-        u.setDocumento(documento);
-        u.setEmail(email);
+        Usuario u = usuarioService.novo(req.perfil(), req.nome(), req.documento(), req.email(),
+                req.telefone(), req.endereco());
         u.setSenha(encoder.encode(req.senha()));
-        u.setTelefone(req.telefone());
-        u.setEndereco(req.endereco());
         u.setAceiteLgpdEm(Instant.now());
         return usuarios.save(u);
     }
 
     public String login(String email, String senha) {
-        Usuario u = usuarios.findByEmail(email.trim().toLowerCase())
+        Usuario u = usuarios.findByEmail(UsuarioService.normalizarEmail(email))
                 .filter(Usuario::isAtivo)
                 .filter(x -> encoder.matches(senha, x.getSenha()))
                 .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "E-mail ou senha inválidos"));
 
         Instant agora = Instant.now();
         // O perfil vai na claim "scope" e o Spring o expõe como a authority SCOPE_<PERFIL>.
-        // ponytail: token não é revogado ao inativar o usuário; vale até expirar (app.jwt.expiracao).
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .subject(u.getId().toString())
                 .issuedAt(agora)

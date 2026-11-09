@@ -21,7 +21,16 @@ Usuário admin de desenvolvimento: `admin@resgatai.local` / `admin12345`.
 |---|---|---|
 | `POST /auth/registro` | público | Cadastro de Estabelecimento ou Instituição (instituição entra como `PENDENTE`) |
 | `POST /auth/login` | público | Retorna `{ "token": "<JWT>" }` |
+| `POST /auth/definir-senha` | público | Primeiro acesso: `{ token, senha, aceiteLgpd }` (link gerado pelo admin) |
 | `GET /auth/me` | autenticado | Dados do usuário logado (`Authorization: Bearer <JWT>`) |
+| `GET /admin/usuarios` | admin | Busca paginada; filtros `nome`, `documento`, `perfil`, `ativo`, `statusAnalise` |
+| `GET /admin/usuarios/{id}` | admin | Consultar usuário |
+| `POST /admin/usuarios` | admin | Cadastrar usuário; retorna o `linkPrimeiroAcesso` |
+| `PUT /admin/usuarios/{id}` | admin | Atualizar nome, e-mail, telefone e endereço |
+| `DELETE /admin/usuarios/{id}` | admin | Inativar (o token do usuário deixa de valer na hora) |
+| `POST /admin/usuarios/{id}/aprovar` | admin | Aprovar instituição (RF06) |
+| `POST /admin/usuarios/{id}/rejeitar` | admin | Rejeitar instituição: `{ motivo }` |
+| `GET /admin/auditoria?usuarioId=` | admin | Log de auditoria |
 | `GET /actuator/health` | público | Health check |
 
 Em produção defina `SPRING_PROFILES_ACTIVE=prod`, `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`,
