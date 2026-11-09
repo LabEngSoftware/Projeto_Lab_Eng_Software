@@ -11,6 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
 import resgatai.auditoria.Auditoria;
 import resgatai.auditoria.AuditoriaRepository;
 import resgatai.geo.Geocodificador;
+import resgatai.reserva.ReservaRepository;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -39,6 +40,7 @@ public class UsuarioService {
     private final AuditoriaRepository auditoria;
     private final PasswordEncoder encoder;
     private final Geocodificador geocodificador;
+    private final ReservaRepository reservas;
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
@@ -150,8 +152,10 @@ public class UsuarioService {
             throw new ResponseStatusException(BAD_REQUEST, "O administrador não pode inativar a própria conta");
         }
         Usuario u = buscar(id);
-        // Lotes de doador inativo saem da busca (LoteFiltro).
-        // TODO B4: verificar reservas em andamento antes de inativar (UC01 fluxo 3c, passo 2)
+        // UC01 3c passo 2: lotes de doador inativo já saem da busca (LoteFiltro); reserva em andamento bloqueia
+        if (reservas.emAndamento(id)) {
+            throw new ResponseStatusException(CONFLICT, "O usuário possui reservas em andamento; aguarde a retirada ou a expiração");
+        }
         if (u.isAtivo()) {
             u.setAtivo(false);
             auditoria.save(new Auditoria(autorId, USUARIO_INATIVADO, "USUARIO", id, null));

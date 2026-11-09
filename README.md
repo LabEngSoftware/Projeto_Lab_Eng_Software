@@ -37,6 +37,8 @@ Usuário admin de desenvolvimento: `admin@resgatai.local` / `admin12345`.
 | `GET /lotes` | autenticado | Busca de lotes disponíveis (RF03); filtros `nome`, `categoria`, `precoMin`, `precoMax`, `venceAte`, `raioKm` (padrão 10) e `latitude`/`longitude` (padrão: endereço do usuário) |
 | `GET /lotes/{id}` | autenticado | Consultar lote, com `distanciaKm` até o usuário |
 | `GET /lotes/{id}/foto` | público | Imagem do lote |
+| `POST /lotes/{id}/reserva` | instituição aprovada | Reservar lote (UC04): lock no registro, só a primeira requisição vence (as demais recebem 409); retorna `pin` e `qrCode` |
+| `GET /reservas` | autenticado | Instituição: as próprias reservas, com PIN. Estabelecimento: reservas dos seus lotes, sem PIN |
 | `GET /actuator/health` | público | Health check |
 
 Endereços são geocodificados no cadastro pela API pública do [Nominatim](https://nominatim.org) (OpenStreetMap);

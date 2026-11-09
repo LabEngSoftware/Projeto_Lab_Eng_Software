@@ -19,10 +19,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class LoteControllerTest extends ApiTest {
 
-    static final String PADARIA = ONG.replace("INSTITUICAO", "ESTABELECIMENTO")
-            .replace("11.222.333/0001-81", "11.444.777/0001-61")
-            .replace("ong@", "padaria@")
-            .replace("ONG Teste", "Padaria Central");
     static final String CAMPINAS = "Av. Francisco Glicério, 1000, Campinas";
 
     @Autowired
@@ -39,16 +35,6 @@ class LoteControllerTest extends ApiTest {
         postJson("/auth/registro", ONG);
         padaria = login("padaria@teste.com", "senha12345");
         ong = login("ong@teste.com", "senha12345");
-    }
-
-    /** Lote cuja janela de retirada vai de agora até a validade. */
-    static String lote(String nome, String categoria, int preco, Duration validade, String enderecoRetirada) {
-        Instant agora = Instant.now();
-        return """
-                {"nome":"%s","categoria":"%s","quantidade":50,"unidade":"UNIDADE","preco":%d,
-                 "validade":"%s","retiradaInicio":"%s","retiradaFim":"%s","enderecoRetirada":%s}"""
-                .formatted(nome, categoria, preco, agora.plus(validade), agora, agora.plus(validade),
-                        enderecoRetirada == null ? "null" : "\"" + enderecoRetirada + "\"");
     }
 
     Integer criar(String body) throws Exception {

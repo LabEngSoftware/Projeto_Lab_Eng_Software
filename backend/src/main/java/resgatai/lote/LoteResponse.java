@@ -26,7 +26,7 @@ public record LoteResponse(
         Instant criadoEm) {
 
     /** distanciaKm é medida a partir de origem, quando informada. */
-    static LoteResponse from(Lote l, Coordenadas origem) {
+    public static LoteResponse from(Lote l, Coordenadas origem) {
         Double distancia = origem == null ? null : Math.round(origem.distanciaKm(l.getCoordenadas()) * 10) / 10.0;
         return new LoteResponse(l.getId(), l.getEstabelecimento().getId(), l.getEstabelecimento().getNome(),
                 l.getNome(), l.getCategoria(), l.getQuantidade(), l.getUnidade(), l.getPreco(), l.getValidade(),

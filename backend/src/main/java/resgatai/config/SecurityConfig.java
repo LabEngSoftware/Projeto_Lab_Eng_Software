@@ -53,6 +53,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/lotes").hasAuthority("SCOPE_ESTABELECIMENTO")
                         .requestMatchers(HttpMethod.PUT, "/lotes/*/foto").hasAuthority("SCOPE_ESTABELECIMENTO")
                         .requestMatchers("/lotes/meus").hasAuthority("SCOPE_ESTABELECIMENTO")
+                        .requestMatchers(HttpMethod.POST, "/lotes/*/reserva").hasAuthority("SCOPE_INSTITUICAO")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()))
                 .build();

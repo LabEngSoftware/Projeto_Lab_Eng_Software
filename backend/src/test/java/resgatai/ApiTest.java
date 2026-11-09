@@ -14,6 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 import resgatai.geo.Coordenadas;
 import resgatai.geo.Geocodificador;
 
+import java.time.Duration;
+import java.time.Instant;
+
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -35,6 +38,11 @@ public abstract class ApiTest {
             {"perfil":"INSTITUICAO","nome":"ONG Teste","documento":"11.222.333/0001-81",
              "email":"ong@teste.com","senha":"senha12345","telefone":"11999999999",
              "endereco":"Rua da Consolação, 930","aceiteLgpd":true}""";
+
+    protected static final String PADARIA = ONG.replace("INSTITUICAO", "ESTABELECIMENTO")
+            .replace("11.222.333/0001-81", "11.444.777/0001-61")
+            .replace("ong@", "padaria@")
+            .replace("ONG Teste", "Padaria Central");
 
     protected static final Coordenadas MACKENZIE = new Coordenadas(-23.5475, -46.6520);
 
@@ -62,6 +70,16 @@ public abstract class ApiTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         return JsonPath.read(body, "$.token");
+    }
+
+    /** Lote cuja janela de retirada vai de agora até a validade. */
+    protected static String lote(String nome, String categoria, int preco, Duration validade, String enderecoRetirada) {
+        Instant agora = Instant.now();
+        return """
+                {"nome":"%s","categoria":"%s","quantidade":50,"unidade":"UNIDADE","preco":%d,
+                 "validade":"%s","retiradaInicio":"%s","retiradaFim":"%s","enderecoRetirada":%s}"""
+                .formatted(nome, categoria, preco, agora.plus(validade), agora, agora.plus(validade),
+                        enderecoRetirada == null ? "null" : "\"" + enderecoRetirada + "\"");
     }
 
     protected <T> T json(ResultActions result, String path) throws Exception {
