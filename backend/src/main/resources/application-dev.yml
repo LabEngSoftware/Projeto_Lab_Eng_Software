@@ -1,0 +1,12 @@
+# Valores apenas para desenvolvimento local e testes. Nunca usar em produção.
+spring:
+  docker:
+    compose:
+      enabled: true
+
+app:
+  jwt:
+    secret: dev-secret-somente-local-troque-em-producao
+  admin:
+    email: admin@resgatai.local
+    senha: admin12345

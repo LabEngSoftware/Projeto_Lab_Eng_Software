@@ -2,16 +2,18 @@ pipeline {
     agent any
 
     stages {
-        stage('Build & Test') {
+        stage('Backend: Build & Test') {
             steps {
-                sh 'mvn -B clean verify'
+                dir('backend') {
+                    sh './mvnw -B clean verify'
+                }
             }
         }
     }
 
     post {
         always {
-            junit 'target/surefire-reports/*.xml'
+            junit 'backend/target/surefire-reports/*.xml'
         }
     }
 }
