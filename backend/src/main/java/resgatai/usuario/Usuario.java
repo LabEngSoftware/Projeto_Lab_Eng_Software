@@ -3,6 +3,7 @@ package resgatai.usuario;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import resgatai.geo.Coordenadas;
 
 import java.time.Instant;
 
@@ -25,6 +26,11 @@ public abstract class Usuario {
     private String senha;
     private String telefone;
     private String endereco;
+
+    /** Geocodificação do endereço; nula para o administrador. */
+    @Embedded
+    private Coordenadas coordenadas;
+
     private boolean ativo = true;
     private int score = 100;
     private Instant aceiteLgpdEm;

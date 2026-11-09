@@ -31,7 +31,16 @@ Usuário admin de desenvolvimento: `admin@resgatai.local` / `admin12345`.
 | `POST /admin/usuarios/{id}/aprovar` | admin | Aprovar instituição (RF06) |
 | `POST /admin/usuarios/{id}/rejeitar` | admin | Rejeitar instituição: `{ motivo }` |
 | `GET /admin/auditoria?usuarioId=` | admin | Log de auditoria |
+| `POST /lotes` | estabelecimento | Publicar lote (UC02); `enderecoRetirada` opcional para retirar em outro endereço |
+| `PUT /lotes/{id}/foto` | estabelecimento | Foto do lote (multipart, campo `arquivo`; JPEG/PNG/WebP até 5 MB) |
+| `GET /lotes/meus` | estabelecimento | Lotes do próprio doador, em qualquer status |
+| `GET /lotes` | autenticado | Busca de lotes disponíveis (RF03); filtros `nome`, `categoria`, `precoMin`, `precoMax`, `venceAte`, `raioKm` (padrão 10) e `latitude`/`longitude` (padrão: endereço do usuário) |
+| `GET /lotes/{id}` | autenticado | Consultar lote, com `distanciaKm` até o usuário |
+| `GET /lotes/{id}/foto` | público | Imagem do lote |
 | `GET /actuator/health` | público | Health check |
+
+Endereços são geocodificados no cadastro pela API pública do [Nominatim](https://nominatim.org) (OpenStreetMap);
+nos testes ela é simulada.
 
 Em produção defina `SPRING_PROFILES_ACTIVE=prod`, `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`,
 `SPRING_DATASOURCE_PASSWORD`, `JWT_SECRET` (mínimo 32 caracteres), `ADMIN_EMAIL` e `ADMIN_SENHA`.
