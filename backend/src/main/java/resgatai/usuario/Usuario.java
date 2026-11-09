@@ -26,8 +26,13 @@ public abstract class Usuario {
     private String telefone;
     private String endereco;
     private boolean ativo = true;
+    private int score = 100;
     private Instant aceiteLgpdEm;
     private Instant criadoEm = Instant.now();
+
+    /** Hash SHA-256 do token do link de primeiro acesso (definição de senha). */
+    private String tokenSenhaHash;
+    private Instant tokenSenhaExpiraEm;
 
     public abstract Perfil getPerfil();
 }

@@ -2,6 +2,7 @@ package resgatai.auth;
 
 import resgatai.usuario.Usuario;
 import resgatai.usuario.UsuarioResponse;
+import resgatai.usuario.UsuarioService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService auth;
+    private final UsuarioService usuarioService;
 
     public record RegistroRequest(
             @NotNull Usuario.Perfil perfil,
@@ -33,6 +35,12 @@ public class AuthController {
 
     public record TokenResponse(String token) {}
 
+    public record DefinirSenhaRequest(
+            @NotBlank String token,
+            @NotBlank @Size(min = 8, max = 72) String senha,
+            @NotNull @AssertTrue(message = "é necessário aceitar os termos de uso e a política de privacidade (LGPD)")
+            Boolean aceiteLgpd) {}
+
     @PostMapping("/registro")
     @ResponseStatus(HttpStatus.CREATED)
     public UsuarioResponse registrar(@Valid @RequestBody RegistroRequest req) {
@@ -42,6 +50,13 @@ public class AuthController {
     @PostMapping("/login")
     public TokenResponse login(@Valid @RequestBody LoginRequest req) {
         return new TokenResponse(auth.login(req.email(), req.senha()));
+    }
+
+    /** Primeiro acesso de usuário cadastrado pelo administrador (UC01 passo 8). */
+    @PostMapping("/definir-senha")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void definirSenha(@Valid @RequestBody DefinirSenhaRequest req) {
+        usuarioService.definirSenha(req.token(), req.senha());
     }
 
     @GetMapping("/me")
