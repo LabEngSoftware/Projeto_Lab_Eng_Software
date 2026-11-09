@@ -1,19 +1,28 @@
 package resgatai;
 
 import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
+import resgatai.geo.Coordenadas;
+import resgatai.geo.Geocodificador;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Base dos testes de API: sobe a aplicação com H2 e desfaz as alterações no banco ao fim de cada teste. */
+/**
+ * Base dos testes de API: sobe a aplicação com H2 e desfaz as alterações no banco ao fim de cada teste.
+ * A geocodificação é simulada e, por padrão, todo endereço cai no Mackenzie.
+ */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
@@ -27,8 +36,18 @@ public abstract class ApiTest {
              "email":"ong@teste.com","senha":"senha12345","telefone":"11999999999",
              "endereco":"Rua da Consolação, 930","aceiteLgpd":true}""";
 
+    protected static final Coordenadas MACKENZIE = new Coordenadas(-23.5475, -46.6520);
+
     @Autowired
     protected MockMvc mvc;
+
+    @MockitoBean
+    protected Geocodificador geocodificador;
+
+    @BeforeEach
+    void geocodificacaoPadrao() {
+        when(geocodificador.geocodificar(anyString())).thenReturn(MACKENZIE);
+    }
 
     protected ResultActions postJson(String url, String body) throws Exception {
         return mvc.perform(post(url).contentType(MediaType.APPLICATION_JSON).content(body));

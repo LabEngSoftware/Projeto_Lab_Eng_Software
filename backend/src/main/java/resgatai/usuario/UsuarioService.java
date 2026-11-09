@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import resgatai.auditoria.Auditoria;
 import resgatai.auditoria.AuditoriaRepository;
+import resgatai.geo.Geocodificador;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -37,6 +38,7 @@ public class UsuarioService {
     private final UsuarioRepository usuarios;
     private final AuditoriaRepository auditoria;
     private final PasswordEncoder encoder;
+    private final Geocodificador geocodificador;
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
@@ -73,6 +75,9 @@ public class UsuarioService {
         u.setEmail(email);
         u.setTelefone(telefone);
         u.setEndereco(endereco);
+        if (perfil != Usuario.Perfil.ADMIN) {
+            u.setCoordenadas(geocodificador.geocodificar(endereco)); // valida o endereço de retirada/atuação
+        }
         return u;
     }
 
@@ -122,6 +127,10 @@ public class UsuarioService {
             throw new ResponseStatusException(CONFLICT, "Já existe um usuário com este e-mail");
         }
 
+        if (!(u instanceof Administrador) && !Objects.equals(u.getEndereco(), endereco)) {
+            u.setCoordenadas(geocodificador.geocodificar(endereco));
+        }
+
         List<String> mudancas = new ArrayList<>();
         alterar("nome", u.getNome(), nome.trim(), u::setNome, mudancas);
         alterar("email", u.getEmail(), email, u::setEmail, mudancas);
@@ -141,7 +150,8 @@ public class UsuarioService {
             throw new ResponseStatusException(BAD_REQUEST, "O administrador não pode inativar a própria conta");
         }
         Usuario u = buscar(id);
-        // TODO B3/B4: verificar lotes ativos e reservas em andamento antes de inativar (UC01 fluxo 3c, passo 2)
+        // Lotes de doador inativo saem da busca (LoteFiltro).
+        // TODO B4: verificar reservas em andamento antes de inativar (UC01 fluxo 3c, passo 2)
         if (u.isAtivo()) {
             u.setAtivo(false);
             auditoria.save(new Auditoria(autorId, USUARIO_INATIVADO, "USUARIO", id, null));

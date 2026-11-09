@@ -48,7 +48,11 @@ public class SecurityConfig {
                 .authorizeHttpRequests(a -> a
                         .requestMatchers(HttpMethod.POST, "/auth/registro", "/auth/login", "/auth/definir-senha").permitAll()
                         .requestMatchers("/actuator/health", "/error").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/lotes/*/foto").permitAll()
                         .requestMatchers("/admin/**").hasAuthority("SCOPE_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/lotes").hasAuthority("SCOPE_ESTABELECIMENTO")
+                        .requestMatchers(HttpMethod.PUT, "/lotes/*/foto").hasAuthority("SCOPE_ESTABELECIMENTO")
+                        .requestMatchers("/lotes/meus").hasAuthority("SCOPE_ESTABELECIMENTO")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(o -> o.jwt(Customizer.withDefaults()))
                 .build();
