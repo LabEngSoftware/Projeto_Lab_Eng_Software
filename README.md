@@ -39,6 +39,10 @@ Usuário admin de desenvolvimento: `admin@resgatai.local` / `admin12345`.
 | `GET /lotes/{id}/foto` | público | Imagem do lote |
 | `POST /lotes/{id}/reserva` | instituição aprovada | Reservar lote (UC04): lock no registro, só a primeira requisição vence (as demais recebem 409); retorna `pin` e `qrCode` |
 | `GET /reservas` | autenticado | Instituição: as próprias reservas, com PIN. Estabelecimento: reservas dos seus lotes, sem PIN |
+| `POST /retiradas/conferencia` | estabelecimento | Conferir a reserva pelo `codigo` (conteúdo do QR Code ou PIN digitado) antes da entrega (UC06) |
+| `POST /retiradas` | estabelecimento | Validar a retirada: `codigo`, `quantidadeEntregue` opcional (entrega parcial) e `autorizarAtraso` (fora do prazo); retorna o comprovante |
+| `POST /retiradas/cancelamento` | estabelecimento | Recusar a entrega por divergência: `codigo` e `motivo` |
+| `GET /impacto` | autenticado | Retiradas concluídas e quantidade resgatada por unidade, da plataforma e do usuário |
 | `GET /actuator/health` | público | Health check |
 
 Endereços são geocodificados no cadastro pela API pública do [Nominatim](https://nominatim.org) (OpenStreetMap);

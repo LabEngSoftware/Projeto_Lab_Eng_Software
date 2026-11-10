@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import resgatai.ApiTest;
+import resgatai.auditoria.AuditoriaRepository;
 import resgatai.lote.Lote;
 import resgatai.lote.LoteRepository;
 import resgatai.usuario.Estabelecimento;
@@ -24,6 +25,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.function.IntConsumer;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,11 +43,13 @@ class ReservaConcorrenciaTest extends ApiTest {
     @Autowired ReservaRepository reservas;
     @Autowired LoteRepository lotes;
     @Autowired UsuarioRepository usuarios;
+    @Autowired AuditoriaRepository auditoria;
 
     final List<Usuario> criados = new ArrayList<>();
 
     @AfterEach
     void limpar() {
+        auditoria.deleteAll();
         reservas.deleteAll();
         lotes.deleteAll();
         usuarios.deleteAll(criados);
@@ -61,15 +65,39 @@ class ReservaConcorrenciaTest extends ApiTest {
             return salvar(ong, "ong" + i).getId();
         }).toList();
 
+        List<Integer> status = disputar(ongs.size(), i -> reservaService.reservar(lote.getId(), ongs.get(i)));
+        assertThat(status).containsOnly(200, 409).filteredOn(s -> s == 200).hasSize(1);
+        assertThat(reservas.count()).isEqualTo(1);
+        assertThat(lotes.findById(lote.getId()).orElseThrow().getStatus()).isEqualTo(Lote.Status.RESERVADO_PENDENTE);
+    }
+
+    @Test
+    @DisplayName("UC06: validações simultâneas do mesmo código registram uma retirada e pontuam uma vez")
+    void validacoesSimultaneas() throws Exception {
+        var doador = salvar(new Estabelecimento(), "padaria");
+        var ong = new Instituicao();
+        ong.setStatusAnalise(Instituicao.StatusAnalise.APROVADA);
+        salvar(ong, "ong");
+        String qrCode = reservaService.reservar(lotes.save(lote(doador)).getId(), ong.getId()).qrCode();
+
+        List<Integer> status = disputar(INSTITUICOES, i -> reservaService.validar(qrCode, null, false, doador.getId()));
+        assertThat(status).containsOnly(200, 409).filteredOn(s -> s == 200).hasSize(1);
+        assertThat(usuarios.findById(doador.getId()).orElseThrow().getScore()).isEqualTo(100 + ReservaService.PONTOS_RETIRADA);
+        assertThat(reservaService.impacto(null).plataforma().retiradas()).isEqualTo(1);
+    }
+
+    /** Dispara as chamadas no mesmo instante, cada uma em sua thread; sucesso vira 200, recusa vira o status HTTP. */
+    private static List<Integer> disputar(int threads, IntConsumer chamada) throws Exception {
         CountDownLatch largada = new CountDownLatch(1);
         List<Future<Integer>> resultados = new ArrayList<>();
-        try (ExecutorService pool = Executors.newFixedThreadPool(INSTITUICOES)) {
-            for (Long ong : ongs) {
+        try (ExecutorService pool = Executors.newFixedThreadPool(threads)) {
+            for (int i = 0; i < threads; i++) {
+                int n = i;
                 resultados.add(pool.submit(() -> {
                     largada.await();
                     try {
-                        reservaService.reservar(lote.getId(), ong);
-                        return 201;
+                        chamada.accept(n);
+                        return 200;
                     } catch (ResponseStatusException e) {
                         return e.getStatusCode().value();
                     }
@@ -77,12 +105,9 @@ class ReservaConcorrenciaTest extends ApiTest {
             }
             largada.countDown();
         }
-
         List<Integer> status = new ArrayList<>();
         for (Future<Integer> r : resultados) status.add(r.get());
-        assertThat(status).containsOnly(201, 409).filteredOn(s -> s == 201).hasSize(1);
-        assertThat(reservas.count()).isEqualTo(1);
-        assertThat(lotes.findById(lote.getId()).orElseThrow().getStatus()).isEqualTo(Lote.Status.RESERVADO_PENDENTE);
+        return status;
     }
 
     private <T extends Usuario> T salvar(T u, String nome) {
