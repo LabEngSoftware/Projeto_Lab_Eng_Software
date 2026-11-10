@@ -25,7 +25,7 @@ Usuário admin de desenvolvimento: `admin@resgatai.local` / `admin12345`.
 | `GET /auth/me` | autenticado | Dados do usuário logado (`Authorization: Bearer <JWT>`) |
 | `GET /admin/usuarios` | admin | Busca paginada; filtros `nome`, `documento`, `perfil`, `ativo`, `statusAnalise` |
 | `GET /admin/usuarios/{id}` | admin | Consultar usuário |
-| `POST /admin/usuarios` | admin | Cadastrar usuário; retorna o `linkPrimeiroAcesso` |
+| `POST /admin/usuarios` | admin | Cadastrar usuário; o link de primeiro acesso vai por e-mail (sem SMTP, volta em `linkPrimeiroAcesso`) |
 | `PUT /admin/usuarios/{id}` | admin | Atualizar nome, e-mail, telefone e endereço |
 | `DELETE /admin/usuarios/{id}` | admin | Inativar (o token do usuário deixa de valer na hora) |
 | `POST /admin/usuarios/{id}/aprovar` | admin | Aprovar instituição (RF06) |
@@ -43,6 +43,8 @@ Usuário admin de desenvolvimento: `admin@resgatai.local` / `admin12345`.
 | `POST /retiradas` | estabelecimento | Validar a retirada: `codigo`, `quantidadeEntregue` opcional (entrega parcial) e `autorizarAtraso` (fora do prazo); retorna o comprovante |
 | `POST /retiradas/cancelamento` | estabelecimento | Recusar a entrega por divergência: `codigo` e `motivo` |
 | `GET /impacto` | autenticado | Retiradas concluídas e quantidade resgatada por unidade, da plataforma e do usuário |
+| `GET /notificacoes` | autenticado | Caixa de entrada do usuário (novos lotes próximos, reservas, retiradas, expirações) |
+| `PUT /notificacoes/{id}/lida` | autenticado | Marcar notificação como lida |
 | `GET /actuator/health` | público | Health check |
 
 Endereços são geocodificados no cadastro pela API pública do [Nominatim](https://nominatim.org) (OpenStreetMap);
@@ -52,8 +54,15 @@ O prazo de retirada de uma reserva é a metade do tempo restante da janela do lo
 (`EXPIRACAO_CRON`, cron do Spring): reservas não retiradas até 15 minutos após o prazo expiram, a instituição perde
 pontos de score e o lote volta às buscas; lotes disponíveis cuja janela de retirada acabou passam a `EXPIRADO`.
 
+Notificações (RF07) ficam na caixa de entrada (`GET /notificacoes`, consultada pelo PWA) e são enviadas por e-mail
+por um worker a cada 30 segundos (`NOTIFICACAO_CRON`). Um lote novo notifica as instituições aprovadas num raio
+que depende da urgência: 5 km (vence em menos de 6 h), 10 km (menos de 24 h) ou 20 km. Em desenvolvimento, o
+Docker Compose sobe o [Mailpit](https://mailpit.axllent.org): os e-mails aparecem em http://localhost:8025.
+
 Em produção defina `SPRING_PROFILES_ACTIVE=prod`, `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`,
 `SPRING_DATASOURCE_PASSWORD`, `JWT_SECRET` (mínimo 32 caracteres), `ADMIN_EMAIL` e `ADMIN_SENHA`.
+Para enviar e-mails, `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` e `MAIL_REMETENTE`;
+sem eles as notificações ficam só na caixa de entrada.
 
 Os Atores do Sistema
 O Doador (Mercado/Padaria): O usuário que tem o alimento. Ele não tem tempo. Se o processo de doação exigir mais do que três cliques, ele desiste e joga a comida fora.

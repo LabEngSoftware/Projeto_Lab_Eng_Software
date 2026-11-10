@@ -10,6 +10,15 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 5MB
+  mail:
+    properties:
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
+  task:
+    scheduling:
+      pool:
+        size: 2 # o envio de e-mails não atrasa a expiração de reservas
   jpa:
     open-in-view: false
     hibernate:
@@ -24,6 +33,16 @@ app:
     expiracao: 8h
   expiracao:
     cron: ${EXPIRACAO_CRON:0 * * * * *}
+  notificacao:
+    cron: ${NOTIFICACAO_CRON:*/30 * * * * *}
+  mail:
+    remetente: ${MAIL_REMETENTE:ResgatAI <nao-responda@resgatai.local>}
   admin:
     email: ${ADMIN_EMAIL}
     senha: ${ADMIN_SENHA}
+
+# SMTP fora do ar não deve tirar a API do ar no health check
+management:
+  health:
+    mail:
+      enabled: false

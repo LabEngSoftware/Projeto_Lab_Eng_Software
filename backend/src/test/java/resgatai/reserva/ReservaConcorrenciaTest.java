@@ -13,6 +13,7 @@ import resgatai.ApiTest;
 import resgatai.auditoria.AuditoriaRepository;
 import resgatai.lote.Lote;
 import resgatai.lote.LoteRepository;
+import resgatai.notificacao.NotificacaoRepository;
 import resgatai.usuario.Estabelecimento;
 import resgatai.usuario.Instituicao;
 import resgatai.usuario.Usuario;
@@ -47,6 +48,7 @@ class ReservaConcorrenciaTest extends ApiTest {
     @Autowired LoteRepository lotes;
     @Autowired UsuarioRepository usuarios;
     @Autowired AuditoriaRepository auditoria;
+    @Autowired NotificacaoRepository notificacoes;
     @Autowired Expiracao expiracao;
     @Autowired JdbcTemplate jdbc;
 
@@ -55,6 +57,7 @@ class ReservaConcorrenciaTest extends ApiTest {
     @AfterEach
     void limpar() {
         auditoria.deleteAll();
+        notificacoes.deleteAll();
         reservas.deleteAll();
         lotes.deleteAll();
         usuarios.deleteAll(criados);

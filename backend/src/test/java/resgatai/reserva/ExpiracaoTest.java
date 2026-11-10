@@ -74,6 +74,8 @@ class ExpiracaoTest extends ApiTest {
         expiracao.expirar();
         perform(get("/reservas"), ong).andExpect(jsonPath("$.content[0].status").value("EXPIRADA"));
         perform(get("/auth/me"), ong).andExpect(jsonPath("$.score").value(100 - Expiracao.PENALIDADE_NO_SHOW));
+        perform(get("/notificacoes"), ong).andExpect(jsonPath("$.content[0].mensagem").value(containsString("perdeu 10 pontos")));
+        perform(get("/notificacoes"), padaria).andExpect(jsonPath("$.content[0].mensagem").value(containsString("voltou às buscas")));
         perform(get("/admin/auditoria"), admin)
                 .andExpect(jsonPath("$.content[0].acao").value("RESERVA_EXPIRADA"))
                 .andExpect(jsonPath("$.content[0].autorId").doesNotExist());
@@ -95,6 +97,7 @@ class ExpiracaoTest extends ApiTest {
 
         expiracao.expirar();
         perform(get("/lotes/meus"), padaria).andExpect(jsonPath("$.content[0].status").value("EXPIRADO"));
+        perform(get("/notificacoes"), padaria).andExpect(jsonPath("$.content[0].titulo").value("Lote expirado"));
         perform(post("/lotes/" + loteId + "/reserva"), ong)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").value(containsString("janela de retirada")));

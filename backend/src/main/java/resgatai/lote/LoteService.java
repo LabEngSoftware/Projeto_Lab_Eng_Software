@@ -10,7 +10,10 @@ import resgatai.auditoria.Auditoria;
 import resgatai.auditoria.AuditoriaRepository;
 import resgatai.geo.Coordenadas;
 import resgatai.geo.Geocodificador;
+import resgatai.notificacao.Notificador;
 import resgatai.usuario.Estabelecimento;
+import resgatai.usuario.Instituicao;
+import resgatai.usuario.UsuarioRepository;
 import resgatai.usuario.UsuarioService;
 
 import java.util.Set;
@@ -28,6 +31,8 @@ public class LoteService {
     private final UsuarioService usuarioService;
     private final AuditoriaRepository auditoria;
     private final Geocodificador geocodificador;
+    private final UsuarioRepository usuarios;
+    private final Notificador notificador;
 
     /** UC02 fluxo principal: publica o lote como disponível no endereço do doador ou em um endereço alternativo (7a). */
     @Transactional
@@ -62,8 +67,25 @@ public class LoteService {
         lotes.save(l);
 
         auditoria.save(new Auditoria(doadorId, Auditoria.Acao.LOTE_CRIADO, "LOTE", l.getId(), l.getNome()));
-        // TODO B7: incluir o CU03, notificando as instituições no raio do lote (UC02 passo 11)
+        notificarProximas(l);
         return LoteResponse.from(l, null);
+    }
+
+    /**
+     * CU03 Notificar Alimentos Próximos (UC02 passo 11): instituições aprovadas dentro do raio da urgência do lote.
+     * ponytail: varre todas as instituições aprovadas em memória; filtro geográfico no banco quando passarem de milhares.
+     */
+    private void notificarProximas(Lote l) {
+        double raio = l.getUrgencia().raioNotificacaoKm;
+        for (Instituicao i : usuarios.instituicoesAprovadas()) {
+            if (i.getCoordenadas() == null) continue;
+            double km = i.getCoordenadas().distanciaKm(l.getCoordenadas());
+            if (km <= raio) {
+                notificador.notificar(i, "Novo lote perto de você", String.format(Notificador.PT_BR, "%s oferece %s (%s %s) a %.1f km. Retirada até %s.",
+                        l.getEstabelecimento().getNome(), l.getNome(), l.getQuantidade().toPlainString(),
+                        l.getUnidade(), km, Notificador.DATA_HORA.format(l.getRetiradaFim())), "/lotes/" + l.getId());
+            }
+        }
     }
 
     /** RF03: busca de lotes disponíveis, com distância a partir do ponto informado ou do endereço do usuário. */

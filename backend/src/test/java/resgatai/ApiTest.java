@@ -25,9 +25,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Base dos testes de API: sobe a aplicação com H2 e desfaz as alterações no banco ao fim de cada teste.
  * A geocodificação é simulada e, por padrão, todo endereço cai no Mackenzie.
- * O worker de expiração fica desligado; os testes o chamam diretamente.
+ * Os workers ficam desligados (os testes os chamam diretamente) e não há SMTP: quem testa e-mail simula o JavaMailSender.
  */
-@SpringBootTest(properties = "app.expiracao.cron=-")
+@SpringBootTest(properties = {"app.expiracao.cron=-", "app.notificacao.cron=-",
+        "spring.autoconfigure.exclude=org.springframework.boot.mail.autoconfigure.MailSenderAutoConfiguration"})
 @AutoConfigureMockMvc
 @Transactional
 public abstract class ApiTest {

@@ -10,18 +10,18 @@ import resgatai.auditoria.Auditoria;
 import resgatai.auditoria.AuditoriaRepository;
 import resgatai.lote.Lote;
 import resgatai.lote.LoteRepository;
+import resgatai.notificacao.Notificador;
 import resgatai.usuario.Instituicao;
 import resgatai.usuario.UsuarioService;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.springframework.http.HttpStatus.*;
+import static resgatai.notificacao.Notificador.DATA_HORA;
 
 @Service
 @RequiredArgsConstructor
@@ -31,12 +31,11 @@ public class ReservaService {
     private final LoteRepository lotes;
     private final UsuarioService usuarioService;
     private final AuditoriaRepository auditoria;
+    private final Notificador notificador;
 
     /** Pontos de reputação ganhos por retirada concluída; a instituição não pontua quando chega fora do prazo. */
     static final int PONTOS_RETIRADA = 5;
     private static final Pattern QR_CODE = Pattern.compile("RESGATAI-(\\d+)-(\\d{4})");
-    private static final DateTimeFormatter DATA_HORA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
-            .withZone(ZoneId.of("America/Sao_Paulo"));
 
     /**
      * UC04: o lock pessimista na linha do lote faz as requisições simultâneas esperarem a primeira terminar;
@@ -61,7 +60,8 @@ public class ReservaService {
 
         lote.setStatus(Lote.Status.RESERVADO_PENDENTE);
         Reserva r = reservas.save(new Reserva(lote, instituicao));
-        // TODO B7: notificar o doador sobre a reserva (UC04 passo 11)
+        notificador.notificar(lote.getEstabelecimento(), "Lote reservado", "%s reservou %s. Retirada até %s, com o PIN da instituição."
+                .formatted(instituicao.getNome(), lote.getNome(), DATA_HORA.format(r.getPrazoRetirada())), "/reservas"); // UC04 passo 11
         return ReservaResponse.from(r, true);
     }
 
@@ -102,7 +102,9 @@ public class ReservaService {
         r.getInstituicao().setScore(r.getInstituicao().getScore() + (atrasada ? 0 : PONTOS_RETIRADA));
         auditoria.save(new Auditoria(doadorId, Auditoria.Acao.RETIRADA_VALIDADA, "RESERVA", r.getId(),
                 "%s %s de %s%s".formatted(entregue.toPlainString(), r.getLote().getUnidade(), total.toPlainString(), atrasada ? ", fora do prazo" : "")));
-        // TODO B7: notificar a instituição da conclusão (UC06 passo 12)
+        notificador.notificar(r.getInstituicao(), "Retirada concluída", "%s registrou a retirada de %s %s de %s em %s. Obrigado por resgatar!"
+                .formatted(doador.getNome(), entregue.toPlainString(), r.getLote().getUnidade(), r.getLote().getNome(),
+                        DATA_HORA.format(r.getValidadoEm())), "/reservas"); // UC06 passo 12
         return ReservaResponse.from(r, false);
     }
 
@@ -112,7 +114,8 @@ public class ReservaService {
         Reserva r = pendente(codigo, doadorId);
         r.cancelar(motivo);
         auditoria.save(new Auditoria(doadorId, Auditoria.Acao.RETIRADA_CANCELADA, "RESERVA", r.getId(), motivo));
-        // TODO B7: notificar a instituição do cancelamento
+        notificador.notificar(r.getInstituicao(), "Retirada cancelada", "%s cancelou a retirada de %s: %s"
+                .formatted(r.getLote().getEstabelecimento().getNome(), r.getLote().getNome(), motivo), "/reservas"); // UC06 7a
         return ReservaResponse.from(r, false);
     }
 
