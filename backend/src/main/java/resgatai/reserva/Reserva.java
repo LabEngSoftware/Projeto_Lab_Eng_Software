@@ -5,6 +5,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import resgatai.lote.Lote;
+import resgatai.pagamento.Pagamento;
 import resgatai.usuario.Instituicao;
 
 import java.math.BigDecimal;
@@ -46,14 +47,19 @@ public class Reserva {
     private boolean atrasada;
     private String motivoCancelamento;
 
+    /** RF04: liquidado na reserva; nulo quando o lote é doado (preço zero). */
+    @Embedded
+    private Pagamento pagamento;
+
     /**
      * UC04 passo 8: gera o PIN e define o prazo limite pela janela de retirada informada pelo doador.
      * O prazo é a metade do tempo restante da janela, para que, se a instituição não aparecer, o lote
      * volte às buscas com tempo de ser retirado por outra (Estado 4 da descrição do projeto).
      */
-    public Reserva(Lote lote, Instituicao instituicao) {
+    public Reserva(Lote lote, Instituicao instituicao, Pagamento pagamento) {
         this.lote = lote;
         this.instituicao = instituicao;
+        this.pagamento = pagamento;
         this.pin = "%04d".formatted(RANDOM.nextInt(10_000));
         Instant inicio = lote.getRetiradaInicio().isAfter(criadoEm) ? lote.getRetiradaInicio() : criadoEm;
         this.prazoRetirada = inicio.plus(Duration.between(inicio, lote.getRetiradaFim()).dividedBy(2));

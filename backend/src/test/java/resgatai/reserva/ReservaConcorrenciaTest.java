@@ -73,7 +73,7 @@ class ReservaConcorrenciaTest extends ApiTest {
             return salvar(ong, "ong" + i).getId();
         }).toList();
 
-        List<Integer> status = disputar(ongs.size(), i -> reservaService.reservar(lote.getId(), ongs.get(i)));
+        List<Integer> status = disputar(ongs.size(), i -> reservaService.reservar(lote.getId(), ongs.get(i), null, null));
         assertThat(status).containsOnly(200, 409).filteredOn(s -> s == 200).hasSize(1);
         assertThat(reservas.count()).isEqualTo(1);
         assertThat(lotes.findById(lote.getId()).orElseThrow().getStatus()).isEqualTo(Lote.Status.RESERVADO_PENDENTE);
@@ -86,7 +86,7 @@ class ReservaConcorrenciaTest extends ApiTest {
         var ong = new Instituicao();
         ong.setStatusAnalise(Instituicao.StatusAnalise.APROVADA);
         salvar(ong, "ong");
-        String qrCode = reservaService.reservar(lotes.save(lote(doador)).getId(), ong.getId()).qrCode();
+        String qrCode = reservaService.reservar(lotes.save(lote(doador)).getId(), ong.getId(), null, null).qrCode();
 
         List<Integer> status = disputar(INSTITUICOES, i -> reservaService.validar(qrCode, null, false, doador.getId()));
         assertThat(status).containsOnly(200, 409).filteredOn(s -> s == 200).hasSize(1);
@@ -102,7 +102,7 @@ class ReservaConcorrenciaTest extends ApiTest {
         ong.setStatusAnalise(Instituicao.StatusAnalise.APROVADA);
         salvar(ong, "ong");
         Lote lote = lotes.save(lote(doador));
-        String qrCode = reservaService.reservar(lote.getId(), ong.getId()).qrCode();
+        String qrCode = reservaService.reservar(lote.getId(), ong.getId(), null, null).qrCode();
         jdbc.update("update reserva set prazo_retirada = ?", Timestamp.from(Instant.now().minus(Expiracao.TOLERANCIA).minusSeconds(60)));
 
         disputar(2, i -> {

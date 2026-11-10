@@ -11,10 +11,13 @@ import resgatai.auditoria.AuditoriaRepository;
 import resgatai.lote.Lote;
 import resgatai.lote.LoteRepository;
 import resgatai.notificacao.Notificador;
+import resgatai.pagamento.GatewayPagamento;
+import resgatai.pagamento.Pagamento;
 import resgatai.usuario.Instituicao;
 import resgatai.usuario.UsuarioService;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -32,6 +35,7 @@ public class ReservaService {
     private final UsuarioService usuarioService;
     private final AuditoriaRepository auditoria;
     private final Notificador notificador;
+    private final GatewayPagamento gateway;
 
     /** Pontos de reputação ganhos por retirada concluída; a instituição não pontua quando chega fora do prazo. */
     static final int PONTOS_RETIRADA = 5;
@@ -40,10 +44,11 @@ public class ReservaService {
     /**
      * UC04: o lock pessimista na linha do lote faz as requisições simultâneas esperarem a primeira terminar;
      * as seguintes já encontram o lote reservado e recebem 409 (fluxo 6a). O banco nunca grava reserva dupla.
+     * Lote com preço é pago na própria reserva (RF04): pagamento recusado desfaz tudo e o lote segue disponível.
      * ponytail: lock por linha no Postgres; fila/Redis só se a disputa por um mesmo lote virar gargalo.
      */
     @Transactional
-    public ReservaResponse reservar(Long loteId, Long instituicaoId) {
+    public ReservaResponse reservar(Long loteId, Long instituicaoId, Pagamento.Metodo metodo, GatewayPagamento.Cartao cartao) {
         var instituicao = (Instituicao) usuarioService.buscar(instituicaoId); // SecurityConfig garante o perfil
         if (instituicao.getStatusAnalise() != Instituicao.StatusAnalise.APROVADA) { // RF06
             throw new ResponseStatusException(FORBIDDEN, "Cadastro em análise: aguarde a aprovação do administrador para reservar");
@@ -58,8 +63,9 @@ public class ReservaService {
             throw new ResponseStatusException(CONFLICT, "O lote foi reservado por outra instituição e não está mais disponível");
         }
 
+        Pagamento pagamento = lote.getPreco().signum() > 0 ? gateway.cobrar(lote.getPreco(), metodo, cartao) : null;
         lote.setStatus(Lote.Status.RESERVADO_PENDENTE);
-        Reserva r = reservas.save(new Reserva(lote, instituicao));
+        Reserva r = reservas.save(new Reserva(lote, instituicao, pagamento));
         notificador.notificar(lote.getEstabelecimento(), "Lote reservado", "%s reservou %s. Retirada até %s, com o PIN da instituição."
                 .formatted(instituicao.getNome(), lote.getNome(), DATA_HORA.format(r.getPrazoRetirada())), "/reservas"); // UC04 passo 11
         return ReservaResponse.from(r, true);
@@ -97,6 +103,10 @@ public class ReservaService {
         }
 
         r.coletar(entregue, atrasada);
+        if (r.getPagamento() != null) { // 4a: a instituição paga só o que recebeu
+            var p = r.getPagamento();
+            gateway.estornar(p, p.getValor().multiply(total.subtract(entregue)).divide(total, 2, RoundingMode.HALF_UP));
+        }
         var doador = r.getLote().getEstabelecimento();
         doador.setScore(doador.getScore() + PONTOS_RETIRADA);
         r.getInstituicao().setScore(r.getInstituicao().getScore() + (atrasada ? 0 : PONTOS_RETIRADA));
@@ -113,9 +123,11 @@ public class ReservaService {
     public ReservaResponse cancelar(String codigo, String motivo, Long doadorId) {
         Reserva r = pendente(codigo, doadorId);
         r.cancelar(motivo);
+        if (r.getPagamento() != null) gateway.estornar(r.getPagamento(), r.getPagamento().getSaldo());
         auditoria.save(new Auditoria(doadorId, Auditoria.Acao.RETIRADA_CANCELADA, "RESERVA", r.getId(), motivo));
-        notificador.notificar(r.getInstituicao(), "Retirada cancelada", "%s cancelou a retirada de %s: %s"
-                .formatted(r.getLote().getEstabelecimento().getNome(), r.getLote().getNome(), motivo), "/reservas"); // UC06 7a
+        notificador.notificar(r.getInstituicao(), "Retirada cancelada", "%s cancelou a retirada de %s: %s%s"
+                .formatted(r.getLote().getEstabelecimento().getNome(), r.getLote().getNome(), motivo,
+                        r.getPagamento() == null ? "" : ". O valor pago foi estornado."), "/reservas"); // UC06 7a
         return ReservaResponse.from(r, false);
     }
 
