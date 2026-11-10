@@ -22,7 +22,16 @@ public class Lote {
 
     public enum Status { DISPONIVEL, RESERVADO_PENDENTE, COLETADO, CANCELADO, EXPIRADO }
 
-    public enum Urgencia { ALTA, MEDIA, BAIXA }
+    /** CU03: quanto antes o alimento vence, mais perto precisa estar a instituição notificada (Estado 2 da descrição). */
+    public enum Urgencia {
+        ALTA(5), MEDIA(10), BAIXA(20);
+
+        public final double raioNotificacaoKm;
+
+        Urgencia(double raioNotificacaoKm) {
+            this.raioNotificacaoKm = raioNotificacaoKm;
+        }
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

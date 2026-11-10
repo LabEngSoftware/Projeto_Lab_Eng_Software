@@ -11,6 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
 import resgatai.auditoria.Auditoria;
 import resgatai.auditoria.AuditoriaRepository;
 import resgatai.geo.Geocodificador;
+import resgatai.notificacao.Notificador;
 import resgatai.reserva.ReservaRepository;
 
 import java.nio.charset.StandardCharsets;
@@ -41,6 +42,7 @@ public class UsuarioService {
     private final PasswordEncoder encoder;
     private final Geocodificador geocodificador;
     private final ReservaRepository reservas;
+    private final Notificador notificador;
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
@@ -105,8 +107,11 @@ public class UsuarioService {
         usuarios.save(u);
 
         auditoria.save(new Auditoria(autorId, USUARIO_CRIADO, "USUARIO", u.getId(), "perfil: " + perfil));
-        // ponytail: o link volta na resposta para o admin repassar; no B7 passa a ser enviado por e-mail.
-        return new UsuarioCriado(u, frontendUrl + "/definir-senha?token=" + token);
+        // UC01 passo 8: o link vai por e-mail; sem SMTP (ou se o envio falhar) volta na resposta para o admin repassar
+        String link = frontendUrl + "/definir-senha?token=" + token;
+        boolean enviado = notificador.enviarEmail(u, "ResgatAI: defina sua senha",
+                "Olá, %s!\n\nSeu cadastro no ResgatAI foi criado. Defina sua senha em até 48 horas:\n%s".formatted(u.getNome(), link));
+        return new UsuarioCriado(u, enviado ? null : link);
     }
 
     @Transactional

@@ -9,6 +9,7 @@ import resgatai.auditoria.Auditoria;
 import resgatai.auditoria.AuditoriaRepository;
 import resgatai.lote.Lote;
 import resgatai.lote.LoteRepository;
+import resgatai.notificacao.Notificador;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -33,6 +34,7 @@ public class Expiracao {
     private final ReservaRepository reservas;
     private final LoteRepository lotes;
     private final AuditoriaRepository auditoria;
+    private final Notificador notificador;
 
     @Scheduled(cron = "${app.expiracao.cron}")
     @Transactional
@@ -45,7 +47,11 @@ public class Expiracao {
             r.getInstituicao().setScore(r.getInstituicao().getScore() - PENALIDADE_NO_SHOW);
             auditoria.save(new Auditoria(null, Auditoria.Acao.RESERVA_EXPIRADA, "RESERVA", r.getId(),
                     "Não retirada até " + r.getPrazoRetirada()));
-            // TODO B7: notificar a instituição e o doador da expiração
+            String prazo = Notificador.DATA_HORA.format(r.getPrazoRetirada());
+            notificador.notificar(r.getInstituicao(), "Reserva expirada", "A reserva de %s expirou em %s sem retirada; você perdeu %d pontos de reputação."
+                    .formatted(r.getLote().getNome(), prazo, PENALIDADE_NO_SHOW), "/reservas");
+            notificador.notificar(r.getLote().getEstabelecimento(), "Reserva expirada", "%s não retirou %s até %s; o lote voltou às buscas."
+                    .formatted(r.getInstituicao().getNome(), r.getLote().getNome(), prazo), "/lotes/" + r.getLote().getId());
         }
 
         // depois das reservas: um lote devolvido já fora da janela expira na mesma rodada
@@ -53,7 +59,8 @@ public class Expiracao {
         for (Lote l : encerrados) {
             l.setStatus(Lote.Status.EXPIRADO);
             auditoria.save(new Auditoria(null, Auditoria.Acao.LOTE_EXPIRADO, "LOTE", l.getId(), l.getNome()));
-            // TODO B7: notificar o doador (UC04 6b)
+            notificador.notificar(l.getEstabelecimento(), "Lote expirado", "%s saiu das buscas porque a janela de retirada acabou."
+                    .formatted(l.getNome()), "/lotes/" + l.getId()); // UC04 6b
         }
 
         if (!vencidas.isEmpty() || !encerrados.isEmpty()) {

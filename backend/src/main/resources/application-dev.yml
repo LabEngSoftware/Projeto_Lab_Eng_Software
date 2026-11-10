@@ -3,6 +3,9 @@ spring:
   docker:
     compose:
       enabled: true
+  mail: # Mailpit do compose.yaml; caixa de entrada em http://localhost:8025
+    host: localhost
+    port: 1025
 
 app:
   jwt:
