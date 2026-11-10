@@ -1,9 +1,13 @@
 package resgatai.config;
 
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
@@ -25,5 +29,11 @@ public class ErrorHandler extends ResponseEntityExceptionHandler {
         ex.getBindingResult().getFieldErrors().forEach(e -> erros.putIfAbsent(e.getField(), e.getDefaultMessage()));
         ex.getBody().setProperty("erros", erros);
         return handleExceptionInternal(ex, ex.getBody(), headers, status, request);
+    }
+
+    /** Timeout esperando o lock de um lote disputado (UC04): a instituição pode tentar de novo. */
+    @ExceptionHandler(PessimisticLockingFailureException.class)
+    ProblemDetail lockOcupado() {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "O lote está sendo reservado por outra instituição, tente novamente");
     }
 }
