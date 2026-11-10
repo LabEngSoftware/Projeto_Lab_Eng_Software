@@ -25,8 +25,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Base dos testes de API: sobe a aplicação com H2 e desfaz as alterações no banco ao fim de cada teste.
  * A geocodificação é simulada e, por padrão, todo endereço cai no Mackenzie.
+ * O worker de expiração fica desligado; os testes o chamam diretamente.
  */
-@SpringBootTest
+@SpringBootTest(properties = "app.expiracao.cron=-")
 @AutoConfigureMockMvc
 @Transactional
 public abstract class ApiTest {

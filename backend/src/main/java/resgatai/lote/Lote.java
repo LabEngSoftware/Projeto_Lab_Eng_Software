@@ -20,7 +20,7 @@ public class Lote {
 
     public enum Unidade { UNIDADE, KG, LITRO, PACOTE, CAIXA }
 
-    public enum Status { DISPONIVEL, RESERVADO_PENDENTE, COLETADO, CANCELADO }
+    public enum Status { DISPONIVEL, RESERVADO_PENDENTE, COLETADO, CANCELADO, EXPIRADO }
 
     public enum Urgencia { ALTA, MEDIA, BAIXA }
 

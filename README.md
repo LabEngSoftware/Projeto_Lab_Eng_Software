@@ -48,6 +48,10 @@ Usuário admin de desenvolvimento: `admin@resgatai.local` / `admin12345`.
 Endereços são geocodificados no cadastro pela API pública do [Nominatim](https://nominatim.org) (OpenStreetMap);
 nos testes ela é simulada.
 
+O prazo de retirada de uma reserva é a metade do tempo restante da janela do lote. Um worker roda a cada minuto
+(`EXPIRACAO_CRON`, cron do Spring): reservas não retiradas até 15 minutos após o prazo expiram, a instituição perde
+pontos de score e o lote volta às buscas; lotes disponíveis cuja janela de retirada acabou passam a `EXPIRADO`.
+
 Em produção defina `SPRING_PROFILES_ACTIVE=prod`, `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`,
 `SPRING_DATASOURCE_PASSWORD`, `JWT_SECRET` (mínimo 32 caracteres), `ADMIN_EMAIL` e `ADMIN_SENHA`.
 
