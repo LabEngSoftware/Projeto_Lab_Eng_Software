@@ -52,11 +52,11 @@ public class ReservaService {
 
         Lote lote = lotes.findComBloqueioById(loteId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Lote não encontrado"));
+        if (lote.getStatus() == Lote.Status.EXPIRADO || !lote.getRetiradaFim().isAfter(Instant.now())) { // fluxo 6b; o worker de Expiracao marca o lote
+            throw new ResponseStatusException(CONFLICT, "O lote venceu ou está fora da janela de retirada");
+        }
         if (lote.getStatus() != Lote.Status.DISPONIVEL || !lote.getEstabelecimento().isAtivo()) {
             throw new ResponseStatusException(CONFLICT, "O lote foi reservado por outra instituição e não está mais disponível");
-        }
-        if (!lote.getRetiradaFim().isAfter(Instant.now())) { // fluxo 6b; o B6 marca o lote como expirado
-            throw new ResponseStatusException(CONFLICT, "O lote venceu ou está fora da janela de retirada");
         }
 
         lote.setStatus(Lote.Status.RESERVADO_PENDENTE);
@@ -125,7 +125,7 @@ public class ReservaService {
 
     /**
      * Localiza a reserva pelo conteúdo do QR Code ou pelo PIN digitado (4a), só entre as dos lotes do doador,
-     * travando-a para que dois cliques (ou a expiração do B6) não a processem duas vezes.
+     * travando-a para que dois cliques (ou o worker de Expiracao) não a processem duas vezes.
      */
     private Reserva pendente(String codigo, Long doadorId) {
         Matcher qr = QR_CODE.matcher(codigo.strip());
@@ -147,6 +147,8 @@ public class ReservaService {
                     .formatted(DATA_HORA.format(r.getValidadoEm()), r.getLote().getEstabelecimento().getNome())); // 5b
             case CANCELADA -> throw new ResponseStatusException(CONFLICT, "Retirada cancelada em %s: %s"
                     .formatted(DATA_HORA.format(r.getValidadoEm()), r.getMotivoCancelamento()));
+            case EXPIRADA -> throw new ResponseStatusException(CONFLICT, "Reserva expirada: o prazo de retirada acabou em %s e o lote voltou às buscas"
+                    .formatted(DATA_HORA.format(r.getPrazoRetirada())));
         }
         return r;
     }

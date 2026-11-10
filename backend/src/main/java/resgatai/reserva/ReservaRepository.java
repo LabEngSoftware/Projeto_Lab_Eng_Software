@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,4 +38,8 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
               and (:usuarioId is null or r.instituicao.id = :usuarioId or r.lote.estabelecimento.id = :usuarioId)
             group by r.lote.unidade""")
     List<Impacto.PorUnidade> impacto(Long usuarioId);
+
+    /** Travadas como na validação: a expiração espera uma retirada em andamento terminar, e vice-versa. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<Reserva> findByStatusAndPrazoRetiradaBefore(Reserva.Status status, Instant limite);
 }

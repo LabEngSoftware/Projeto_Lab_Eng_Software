@@ -9,6 +9,7 @@ import resgatai.usuario.Instituicao;
 
 import java.math.BigDecimal;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
 
 /** Reserva de um lote por uma instituição (UC04), com o PIN usado na validação da retirada. */
@@ -17,7 +18,7 @@ import java.time.Instant;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Reserva {
 
-    public enum Status { PENDENTE, COLETADA, CANCELADA }
+    public enum Status { PENDENTE, COLETADA, CANCELADA, EXPIRADA }
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -45,12 +46,17 @@ public class Reserva {
     private boolean atrasada;
     private String motivoCancelamento;
 
-    /** UC04 passo 8: gera o PIN e define o prazo limite pela janela de retirada informada pelo doador. */
+    /**
+     * UC04 passo 8: gera o PIN e define o prazo limite pela janela de retirada informada pelo doador.
+     * O prazo é a metade do tempo restante da janela, para que, se a instituição não aparecer, o lote
+     * volte às buscas com tempo de ser retirado por outra (Estado 4 da descrição do projeto).
+     */
     public Reserva(Lote lote, Instituicao instituicao) {
         this.lote = lote;
         this.instituicao = instituicao;
         this.pin = "%04d".formatted(RANDOM.nextInt(10_000));
-        this.prazoRetirada = lote.getRetiradaFim();
+        Instant inicio = lote.getRetiradaInicio().isAfter(criadoEm) ? lote.getRetiradaInicio() : criadoEm;
+        this.prazoRetirada = inicio.plus(Duration.between(inicio, lote.getRetiradaFim()).dividedBy(2));
     }
 
     /** UC06 passos 9-10: sair de PENDENTE invalida o código para novos usos. */
@@ -68,6 +74,12 @@ public class Reserva {
         this.validadoEm = Instant.now();
         this.motivoCancelamento = motivo;
         lote.setStatus(Lote.Status.CANCELADO);
+    }
+
+    /** Expiração por timeout: a instituição não retirou no prazo e o lote volta a ficar disponível. */
+    void expirar() {
+        this.status = Status.EXPIRADA;
+        lote.setStatus(Lote.Status.DISPONIVEL);
     }
 
     /** Conteúdo do QR Code, desenhado pelo front; leva a reserva e o PIN para o doador validar com uma leitura. */
