@@ -37,7 +37,7 @@ Usuário admin de desenvolvimento: `admin@resgatai.local` / `admin12345`.
 | `GET /lotes` | autenticado | Busca de lotes disponíveis (RF03); filtros `nome`, `categoria`, `precoMin`, `precoMax`, `venceAte`, `raioKm` (padrão 10) e `latitude`/`longitude` (padrão: endereço do usuário) |
 | `GET /lotes/{id}` | autenticado | Consultar lote, com `distanciaKm` até o usuário |
 | `GET /lotes/{id}/foto` | público | Imagem do lote |
-| `POST /lotes/{id}/reserva` | instituição aprovada | Reservar lote (UC04): lock no registro, só a primeira requisição vence (as demais recebem 409); retorna `pin` e `qrCode` |
+| `POST /lotes/{id}/reserva` | instituição aprovada | Reservar lote (UC04): lock no registro, só a primeira requisição vence (as demais recebem 409); retorna `pin` e `qrCode`. Lote com preço exige `metodo` (`PIX` ou `CARTAO` + `cartao`) |
 | `GET /reservas` | autenticado | Instituição: as próprias reservas, com PIN. Estabelecimento: reservas dos seus lotes, sem PIN |
 | `POST /retiradas/conferencia` | estabelecimento | Conferir a reserva pelo `codigo` (conteúdo do QR Code ou PIN digitado) antes da entrega (UC06) |
 | `POST /retiradas` | estabelecimento | Validar a retirada: `codigo`, `quantidadeEntregue` opcional (entrega parcial) e `autorizarAtraso` (fora do prazo); retorna o comprovante |
@@ -53,6 +53,10 @@ nos testes ela é simulada.
 O prazo de retirada de uma reserva é a metade do tempo restante da janela do lote. Um worker roda a cada minuto
 (`EXPIRACAO_CRON`, cron do Spring): reservas não retiradas até 15 minutos após o prazo expiram, a instituição perde
 pontos de score e o lote volta às buscas; lotes disponíveis cuja janela de retirada acabou passam a `EXPIRADO`.
+
+O pagamento (RF04) é simulado e liquidado na própria reserva: PIX é aprovado na hora; no cartão, número fora do
+Luhn, cartão vencido ou terminado em `0002` são recusados (402) e o lote segue disponível. Só o final do cartão é
+guardado. Retirada cancelada ou reserva expirada estornam o valor; entrega parcial estorna a parte não entregue.
 
 Notificações (RF07) ficam na caixa de entrada (`GET /notificacoes`, consultada pelo PWA) e são enviadas por e-mail
 por um worker a cada 30 segundos (`NOTIFICACAO_CRON`). Um lote novo notifica as instituições aprovadas num raio

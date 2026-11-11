@@ -10,6 +10,7 @@ import resgatai.auditoria.AuditoriaRepository;
 import resgatai.lote.Lote;
 import resgatai.lote.LoteRepository;
 import resgatai.notificacao.Notificador;
+import resgatai.pagamento.GatewayPagamento;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -35,6 +36,7 @@ public class Expiracao {
     private final LoteRepository lotes;
     private final AuditoriaRepository auditoria;
     private final Notificador notificador;
+    private final GatewayPagamento gateway;
 
     @Scheduled(cron = "${app.expiracao.cron}")
     @Transactional
@@ -45,11 +47,13 @@ public class Expiracao {
         for (Reserva r : vencidas) {
             r.expirar();
             r.getInstituicao().setScore(r.getInstituicao().getScore() - PENALIDADE_NO_SHOW);
+            if (r.getPagamento() != null) gateway.estornar(r.getPagamento(), r.getPagamento().getSaldo()); // não levou, não paga
             auditoria.save(new Auditoria(null, Auditoria.Acao.RESERVA_EXPIRADA, "RESERVA", r.getId(),
                     "Não retirada até " + r.getPrazoRetirada()));
             String prazo = Notificador.DATA_HORA.format(r.getPrazoRetirada());
-            notificador.notificar(r.getInstituicao(), "Reserva expirada", "A reserva de %s expirou em %s sem retirada; você perdeu %d pontos de reputação."
-                    .formatted(r.getLote().getNome(), prazo, PENALIDADE_NO_SHOW), "/reservas");
+            notificador.notificar(r.getInstituicao(), "Reserva expirada", "A reserva de %s expirou em %s sem retirada; você perdeu %d pontos de reputação.%s"
+                    .formatted(r.getLote().getNome(), prazo, PENALIDADE_NO_SHOW,
+                            r.getPagamento() == null ? "" : " O valor pago foi estornado."), "/reservas");
             notificador.notificar(r.getLote().getEstabelecimento(), "Reserva expirada", "%s não retirou %s até %s; o lote voltou às buscas."
                     .formatted(r.getInstituicao().getNome(), r.getLote().getNome(), prazo), "/lotes/" + r.getLote().getId());
         }

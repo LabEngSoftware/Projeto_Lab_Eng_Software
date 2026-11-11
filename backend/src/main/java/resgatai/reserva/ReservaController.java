@@ -14,6 +14,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import org.springframework.web.bind.annotation.*;
+import resgatai.pagamento.GatewayPagamento;
+import resgatai.pagamento.Pagamento;
 
 import java.math.BigDecimal;
 
@@ -24,10 +26,15 @@ public class ReservaController {
 
     private final ReservaService service;
 
+    /** Corpo opcional: só lote com preço exige a forma de pagamento (RF04). */
+    public record ReservarRequest(Pagamento.Metodo metodo, @Valid GatewayPagamento.Cartao cartao) {}
+
     @PostMapping("/lotes/{loteId}/reserva")
     @ResponseStatus(HttpStatus.CREATED)
-    public ReservaResponse reservar(@PathVariable Long loteId, @AuthenticationPrincipal Jwt jwt) {
-        return service.reservar(loteId, Long.valueOf(jwt.getSubject()));
+    public ReservaResponse reservar(@PathVariable Long loteId, @Valid @RequestBody(required = false) ReservarRequest req,
+                                    @AuthenticationPrincipal Jwt jwt) {
+        return service.reservar(loteId, Long.valueOf(jwt.getSubject()),
+                req == null ? null : req.metodo(), req == null ? null : req.cartao());
     }
 
     @GetMapping("/reservas")
