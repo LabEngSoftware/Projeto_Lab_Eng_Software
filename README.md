@@ -17,6 +17,17 @@ Rodando pelo IntelliJ: na run configuration, defina **Working directory** como `
 
 Usuário admin de desenvolvimento: `admin@resgatai.local` / `admin12345`.
 
+Frontend (Next.js como PWA; requer Node 20+), com o backend rodando:
+
+```bash
+cd frontend
+npm install
+npm run dev              # http://localhost:3000
+```
+
+O navegador chama `/api/*` no próprio Next, que repassa ao backend (`API_URL`, padrão `http://localhost:8080`),
+então o backend não precisa de CORS. O token JWT fica no `localStorage`.
+
 | Endpoint | Acesso | Descrição |
 |---|---|---|
 | `POST /auth/registro` | público | Cadastro de Estabelecimento ou Instituição (instituição entra como `PENDENTE`) |
@@ -67,6 +78,16 @@ Em produção defina `SPRING_PROFILES_ACTIVE=prod`, `SPRING_DATASOURCE_URL`, `SP
 `SPRING_DATASOURCE_PASSWORD`, `JWT_SECRET` (mínimo 32 caracteres), `ADMIN_EMAIL` e `ADMIN_SENHA`.
 Para enviar e-mails, `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` e `MAIL_REMETENTE`;
 sem eles as notificações ficam só na caixa de entrada.
+
+### Produção (Docker)
+
+```bash
+cp .env.exemplo .env     # preencher: domínio, RDS, JWT_SECRET, admin
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Sobe backend, frontend e o [Caddy](https://caddyserver.com), único serviço exposto (portas 80 e 443), que emite
+o certificado HTTPS do `DOMINIO` sozinho — PWA, service worker e câmera exigem HTTPS. O banco é externo (RDS).
 
 Os Atores do Sistema
 O Doador (Mercado/Padaria): O usuário que tem o alimento. Ele não tem tempo. Se o processo de doação exigir mais do que três cliques, ele desiste e joga a comida fora.

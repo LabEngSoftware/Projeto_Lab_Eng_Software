@@ -5,3 +5,4 @@ out/
 .DS_Store
 Projeto_EngenhariaDeSoftware.pdf
 Projeto_Descricao_Geral.pdf
+.env
