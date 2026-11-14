@@ -1,5 +1,7 @@
 package resgatai.usuario;
 
+import resgatai.geo.Coordenadas;
+
 import java.time.Instant;
 
 public record UsuarioResponse(
@@ -10,6 +12,7 @@ public record UsuarioResponse(
         String email,
         String telefone,
         String endereco,
+        Coordenadas coordenadas,
         boolean ativo,
         int score,
         Instituicao.StatusAnalise statusAnalise,
@@ -18,6 +21,6 @@ public record UsuarioResponse(
     public static UsuarioResponse from(Usuario u) {
         var status = u instanceof Instituicao i ? i.getStatusAnalise() : null;
         return new UsuarioResponse(u.getId(), u.getPerfil(), u.getNome(), u.getDocumento(), u.getEmail(),
-                u.getTelefone(), u.getEndereco(), u.isAtivo(), u.getScore(), status, u.getCriadoEm());
+                u.getTelefone(), u.getEndereco(), u.getCoordenadas(), u.isAtivo(), u.getScore(), status, u.getCriadoEm());
     }
 }

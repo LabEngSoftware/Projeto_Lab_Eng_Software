@@ -1,0 +1,36 @@
+# Produção (EC2): docker compose -f docker-compose.prod.yml up -d --build
+# Variáveis no .env ao lado deste arquivo (modelo em .env.exemplo). O banco é o RDS, fora do compose.
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      FRONTEND_URL: https://${DOMINIO:?}
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:?}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:?}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?}
+      JWT_SECRET: ${JWT_SECRET:?}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?}
+      ADMIN_SENHA: ${ADMIN_SENHA:?}
+
+  # Só o Caddy fica exposto; o navegador chega ao backend pelo /api do frontend.
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on: [backend]
+
+  # HTTPS automático (Let's Encrypt): PWA, service worker e câmera só funcionam em origem segura.
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [frontend]
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMINIO: ${DOMINIO}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+
+volumes:
+  caddy_data: # certificados; sem o volume, cada deploy pede um novo e esbarra no limite do Let's Encrypt

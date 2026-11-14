@@ -30,7 +30,7 @@ public class GatewayPagamento {
     public record Cartao(@NotBlank @Pattern(regexp = "\\d{13,19}", message = "informe só os dígitos do cartão") String numero,
                          @NotBlank String titular,
                          @NotBlank @Pattern(regexp = "(0[1-9]|1[0-2])/\\d{2}", message = "use MM/AA") String validade,
-                         @NotBlank @Pattern(regexp = "\\d{3,4}") String cvv) {}
+                         @NotBlank @Pattern(regexp = "\\d{3,4}", message = "informe os 3 ou 4 dígitos") String cvv) {}
 
     public Pagamento cobrar(BigDecimal valor, Pagamento.Metodo metodo, Cartao cartao) {
         if (metodo == null) {

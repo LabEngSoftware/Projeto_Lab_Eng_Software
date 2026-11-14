@@ -19,6 +19,7 @@ public record LoteResponse(
         Instant retiradaFim,
         String observacoes,
         String enderecoRetirada,
+        Coordenadas coordenadas,
         Lote.Status status,
         Lote.Urgencia urgencia,
         Double distanciaKm,
@@ -31,7 +32,7 @@ public record LoteResponse(
         return new LoteResponse(l.getId(), l.getEstabelecimento().getId(), l.getEstabelecimento().getNome(),
                 l.getNome(), l.getCategoria(), l.getQuantidade(), l.getUnidade(), l.getPreco(), l.getValidade(),
                 l.getRetiradaInicio(), l.getRetiradaFim(), l.getObservacoes(), l.getEnderecoRetirada(),
-                l.getStatus(), l.getUrgencia(), distancia, l.isComFoto() ? "/lotes/" + l.getId() + "/foto" : null,
+                l.getCoordenadas(), l.getStatus(), l.getUrgencia(), distancia, l.isComFoto() ? "/lotes/" + l.getId() + "/foto" : null,
                 l.getCriadoEm());
     }
 }
