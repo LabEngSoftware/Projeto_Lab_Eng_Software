@@ -89,6 +89,35 @@ docker compose -f docker-compose.prod.yml up -d --build
 Sobe backend, frontend e o [Caddy](https://caddyserver.com), único serviço exposto (portas 80 e 443), que emite
 o certificado HTTPS do `DOMINIO` sozinho — PWA, service worker e câmera exigem HTTPS. O banco é externo (RDS).
 
+### CI/CD na AWS (Learner Lab)
+
+Uma EC2 roda o Jenkins e a aplicação; o banco fica no RDS. A cada push na `main`, o webhook do GitHub dispara o
+`Jenkinsfile`: testes do backend → build das imagens (inclui lint e build do front) → `docker compose up -d` →
+verificação do `/api/actuator/health` pela URL pública.
+
+1. **RDS** (Aurora and RDS → Create database): PostgreSQL, template *Free tier*, identificador `resgatai`,
+   usuário `postgres`, senha própria (sem `'`), `db.t3.micro`. Em *Connectivity*, escolha **Connect to an EC2
+   compute resource** e selecione a EC2 do Jenkins (o console libera a porta 5432 só para ela). Em *Additional
+   configuration*, desmarque *Enhanced monitoring* (o Learner Lab não permite). Anote o *Endpoint*.
+2. **EC2 do Jenkins**: *Stop* → *Actions › Instance settings › Change instance type* → `t3.medium`; em *Storage*,
+   clique no volume → *Modify* → 20 GB; *Start*. Em *Elastic IPs*: *Allocate* e *Associate* com a instância.
+   No Security Group dela, adicione as regras de entrada HTTP (80) e HTTPS (443) de `0.0.0.0/0`.
+3. **Webhook**: no GitHub, *Settings › Webhooks*, troque o endereço por `http://<elastic-ip>:8080/github-webhook/`.
+4. **Preparar a EC2** (instala JDK 21, Docker e swap; gera o `/var/lib/jenkins/resgatai.env`):
+   ```bash
+   scp -i ~/.ssh/labsuser.pem infra/ec2-setup.sh ubuntu@<elastic-ip>:
+   ssh -i ~/.ssh/labsuser.pem ubuntu@<elastic-ip> sudo bash ec2-setup.sh <endpoint-do-rds> <senha-do-rds> <email-admin> <senha-admin>
+   ```
+5. **Jenkins** (`http://<elastic-ip>:8080`): *New Item* → nome `resgatai`, tipo **Pipeline**. Marque *GitHub project*
+   (URL do repositório) e *GitHub hook trigger for GITScm polling*. Em *Pipeline*: *Pipeline script from SCM*, Git,
+   `https://github.com/LabEngSoftware/Projeto_Lab_Eng_Software.git`, branch `*/main`, script `Jenkinsfile`.
+   Desative o job antigo do tipo Maven, senão o webhook dispara os dois. *Build Now*.
+6. **Dados de exemplo**: `python3 infra/seed.py https://<ip-com-hífens>.sslip.io/api <email-admin> <senha-admin>`.
+
+O app fica em `https://<ip-com-hífens>.sslip.io` (ex.: Elastic IP `54.1.2.3` → `54-1-2-3.sslip.io`). Quando a
+sessão do Learner Lab acaba, EC2 e RDS param; ao iniciar o lab de novo, confira se o RDS voltou a *Available*.
+Os containers e o Jenkins sobem sozinhos.
+
 Os Atores do Sistema
 O Doador (Mercado/Padaria): O usuário que tem o alimento. Ele não tem tempo. Se o processo de doação exigir mais do que três cliques, ele desiste e joga a comida fora.
 
