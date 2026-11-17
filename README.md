@@ -1,10 +1,63 @@
-# Projeto_Lab_Eng_Software
+# ResgatAI
 
-Logística Dinâmica de Resgate de Perecíveis (Combate à Fome)
+Logística dinâmica de resgate de perecíveis (combate à fome). Mercados e padarias publicam o excedente de alimentos
+perto do vencimento; ONGs, abrigos e cozinhas solidárias próximas são avisadas, reservam o lote e retiram com QR Code
+ou PIN.
+
+**App no ar:** https://3-222-213-101.sslip.io (AWS Learner Lab; fica fora do ar quando a sessão do lab está desligada)
+
+Projeto da disciplina Laboratório de Engenharia de Software (Mackenzie), grupo **Biri Dins**:
+
+- Arthur Roldan Slikta
+- Felipe Haddad
+- Gabriel Kondo
+- João Pedro Bocchini
+- Lucas Brezolini
+
+## Stack
+
+| Camada | Tecnologia |
+|---|---|
+| Backend | Java 21, Spring Boot 4 (Web, Security com JWT, Data JPA), Flyway |
+| Banco | PostgreSQL (Amazon RDS em produção; H2 nos testes) |
+| Frontend | Next.js 16 + React 19 como PWA, mapa com Leaflet/OpenStreetMap |
+| Infra | Docker Compose, Caddy (HTTPS automático), Jenkins, AWS EC2 + RDS |
+
+```
+backend/     API Spring Boot (pacote resgatai)
+frontend/    PWA Next.js
+infra/       setup da EC2 e seed de dados de demonstração
+Jenkinsfile  pipeline de CI/CD
+PROMPTS.md   prompts usados com o assistente de IA durante o desenvolvimento
+```
+
+## Como funciona
+
+**Atores**
+- **Doador** (mercado, padaria, hortifruti): publica lotes em poucos toques e valida a retirada.
+- **Instituição** (ONG, abrigo, cozinha solidária): vê os lotes próximos no mapa, reserva e retira. Só usa o
+  sistema depois de aprovada pelo administrador.
+- **Administrador**: aprova ou rejeita instituições, gerencia usuários e consulta a auditoria.
+
+**Ciclo de vida do lote**
+
+1. **Disponível**: o doador publica o lote com validade e janela de retirada.
+2. **Notificação**: o backend avisa as instituições aprovadas num raio que depende da urgência: 5 km se vence em
+   menos de 6 h, 10 km em menos de 24 h e 20 km nos demais casos.
+3. **Reserva** (`RESERVADO_PENDENTE`): a reserva trava o registro do lote no banco (lock pessimista), então, se duas
+   instituições reservam ao mesmo tempo, só uma vence e a outra recebe um erro claro (409). Lote com preço simbólico
+   exige pagamento simulado (PIX ou cartão). A instituição recebe um QR Code e um PIN de 4 dígitos.
+4. **Expiração**: o prazo de retirada é metade do tempo restante da janela. Sem retirada até 15 min depois do prazo,
+   um worker expira a reserva, tira 10 pontos do score da instituição e o lote volta a ficar disponível. Lotes cuja
+   janela acaba sem reserva viram `EXPIRADO`.
+5. **Retirada** (`COLETADO`): o doador lê o QR Code ou digita o PIN da instituição, confere o lote e confirma a
+   entrega (inteira ou parcial). O doador ganha 5 pontos de score, e a instituição também, se retirou no prazo.
+   Se o lote não confere, o doador
+   recusa a entrega (`CANCELADO`) e o pagamento é estornado.
 
 ## Como rodar
 
-Pré-requisitos: Java 21+ e Docker.
+Pré-requisitos: Java 21+, Node 20+ e Docker.
 
 ```bash
 cd backend
@@ -17,7 +70,7 @@ Rodando pelo IntelliJ: na run configuration, defina **Working directory** como `
 
 Usuário admin de desenvolvimento: `admin@resgatai.local` / `admin12345`.
 
-Frontend (Next.js como PWA; requer Node 20+), com o backend rodando:
+Frontend, com o backend rodando:
 
 ```bash
 cd frontend
@@ -26,7 +79,27 @@ npm run dev              # http://localhost:3000
 ```
 
 O navegador chama `/api/*` no próprio Next, que repassa ao backend (`API_URL`, padrão `http://localhost:8080`),
-então o backend não precisa de CORS. O token JWT fica no `localStorage`.
+então o backend não precisa de CORS. O token JWT fica no `localStorage`. Para mexer só no front usando o backend
+da AWS: `API_URL=https://3-222-213-101.sslip.io/api npm run dev`.
+
+### Dados de demonstração
+
+```bash
+python3 infra/seed.py http://localhost:8080 admin@resgatai.local admin12345          # local
+python3 infra/seed.py https://3-222-213-101.sslip.io/api <email-admin> <senha-admin>  # produção
+```
+
+Cria doadores, instituições e lotes em São Paulo, todos com a senha `resgatai123`:
+
+| Perfil | E-mail |
+|---|---|
+| Doador | `padaria@resgatai.demo`, `mercado@resgatai.demo`, `hortifruti@resgatai.demo` |
+| Instituição aprovada | `ong@resgatai.demo`, `cozinha@resgatai.demo` |
+| Instituição aguardando aprovação | `abrigo@resgatai.demo` |
+
+Os lotes vencem em horas ou dias: rode de novo antes de uma demonstração.
+
+## API
 
 | Endpoint | Acesso | Descrição |
 |---|---|---|
@@ -61,25 +134,22 @@ então o backend não precisa de CORS. O token JWT fica no `localStorage`.
 Endereços são geocodificados no cadastro pela API pública do [Nominatim](https://nominatim.org) (OpenStreetMap);
 nos testes ela é simulada.
 
-O prazo de retirada de uma reserva é a metade do tempo restante da janela do lote. Um worker roda a cada minuto
-(`EXPIRACAO_CRON`, cron do Spring): reservas não retiradas até 15 minutos após o prazo expiram, a instituição perde
-pontos de score e o lote volta às buscas; lotes disponíveis cuja janela de retirada acabou passam a `EXPIRADO`.
+O worker de expiração roda a cada minuto (`EXPIRACAO_CRON`, cron do Spring).
 
 O pagamento (RF04) é simulado e liquidado na própria reserva: PIX é aprovado na hora; no cartão, número fora do
 Luhn, cartão vencido ou terminado em `0002` são recusados (402) e o lote segue disponível. Só o final do cartão é
 guardado. Retirada cancelada ou reserva expirada estornam o valor; entrega parcial estorna a parte não entregue.
 
 Notificações (RF07) ficam na caixa de entrada (`GET /notificacoes`, consultada pelo PWA) e são enviadas por e-mail
-por um worker a cada 30 segundos (`NOTIFICACAO_CRON`). Um lote novo notifica as instituições aprovadas num raio
-que depende da urgência: 5 km (vence em menos de 6 h), 10 km (menos de 24 h) ou 20 km. Em desenvolvimento, o
-Docker Compose sobe o [Mailpit](https://mailpit.axllent.org): os e-mails aparecem em http://localhost:8025.
+por um worker a cada 30 segundos (`NOTIFICACAO_CRON`). Em desenvolvimento, o Docker Compose sobe o
+[Mailpit](https://mailpit.axllent.org): os e-mails aparecem em http://localhost:8025.
 
 Em produção defina `SPRING_PROFILES_ACTIVE=prod`, `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`,
 `SPRING_DATASOURCE_PASSWORD`, `JWT_SECRET` (mínimo 32 caracteres), `ADMIN_EMAIL` e `ADMIN_SENHA`.
 Para enviar e-mails, `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` e `MAIL_REMETENTE`;
 sem eles as notificações ficam só na caixa de entrada.
 
-### Produção (Docker)
+## Produção (Docker)
 
 ```bash
 cp .env.exemplo .env     # preencher: domínio, RDS, JWT_SECRET, admin
@@ -89,7 +159,7 @@ docker compose -f docker-compose.prod.yml up -d --build
 Sobe backend, frontend e o [Caddy](https://caddyserver.com), único serviço exposto (portas 80 e 443), que emite
 o certificado HTTPS do `DOMINIO` sozinho — PWA, service worker e câmera exigem HTTPS. O banco é externo (RDS).
 
-### CI/CD na AWS (Learner Lab)
+## CI/CD na AWS (Learner Lab)
 
 Uma EC2 roda o Jenkins e a aplicação; o banco fica no RDS. A cada push na `main`, o webhook do GitHub dispara o
 `Jenkinsfile`: testes do backend → build das imagens (inclui lint e build do front) → `docker compose up -d` →
@@ -117,43 +187,3 @@ verificação do `/api/actuator/health` pela URL pública.
 O app fica em `https://<ip-com-hífens>.sslip.io` (ex.: Elastic IP `54.1.2.3` → `54-1-2-3.sslip.io`). Quando a
 sessão do Learner Lab acaba, EC2 e RDS param; ao iniciar o lab de novo, confira se o RDS voltou a *Available*.
 Os containers e o Jenkins sobem sozinhos.
-
-Os Atores do Sistema
-O Doador (Mercado/Padaria): O usuário que tem o alimento. Ele não tem tempo. Se o processo de doação exigir mais do que três cliques, ele desiste e joga a comida fora.
-
-O Receptor (ONG/Abrigo): O usuário que precisa do alimento. Operam com recursos escassos, dependem de voluntários para o transporte e precisam de previsibilidade.
-
-O Motor de Roteamento (Seu Backend): O "ator" silencioso que cruza dados geográficos, tempo de validade e gerencia as transações concorrentes para garantir que ninguém perca a viagem.
-
-O Fluxo Lógico e a Máquina de Estados
-A vida útil de uma doação dentro do sistema não é apenas um registro no banco de dados, é uma máquina de estados finitos rigorosa.
-
-Estado 1: Criação (Ingestão Rápida). O Doador abre o sistema e informa: "Lote de 50 pães franceses, validade em 4 horas". O sistema registra o lote com o status DISPONIVEL.
-
-Estado 2: O Roteamento e Notificação. O backend calcula um raio de distância baseado no tempo de validade. Alimentos que vencem em 2 horas só notificam ONGs a 5km. Alimentos que vencem em 12 horas podem notificar ONGs a 20km.
-
-Estado 3: A Corrida Crítica (Reserva). Múltiplas ONGs recebem o push. Duas apertam "Aceitar Lote" no mesmo milissegundo. Aqui entra o coração da sua engenharia: o sistema aplica um Lock transacional (otimista ou pessimista). Apenas uma requisição vence. O estado do lote muda para RESERVADO_PENDENTE_RETIRADA. A ONG perdedora recebe um erro claro informando que o lote já foi pego.
-
-Estado 4: Timeout de Abandono (Job Assíncrono). Se a ONG reservou, mas não buscou em um tempo pré-determinado (ex: 50% do tempo de validade restante), um worker em background expira a reserva, penaliza a ONG (diminuindo seu score futuro) e volta o lote para DISPONIVEL.
-
-Estado 5: O Handshake (Conclusão). A ONG chega ao local, lê um QR Code simples na tela do Doador ou insere um PIN de 4 dígitos. A transação atômica é efetivada. Lote muda para COLETADO.
-
-Funcionalidades Core (Visão Modular)
-Para não construir um monólito engessado, o domínio da aplicação deve ser dividido em módulos com responsabilidades únicas.
-
-Gestão de Inventário e Validade: Módulo responsável apenas por cadastrar os lotes e monitorar o tempo de expiração de forma contínua.
-
-Motor de Matchmaking Geoespacial: Módulo isolado que recebe coordenadas e retorna a lista de ONGs elegíveis, priorizando as que têm maior índice de coleta bem-sucedida ou menor distância.
-
-Gerenciador de Concorrência e Reservas: A camada de infraestrutura que gerencia a fila de requisições, garantindo que o banco de dados nunca registre uma dupla reserva.
-
-Sistema de Reputação e Punição (Score): Funcionalidade para lidar com o comportamento humano. Doadores que cancelam muito ou ONGs que reservam e não buscam perdem prioridade no algoritmo.
-
-O Teste de Estresse (Perspectivas e Contrapontos)
-Como seu parceiro de projeto, preciso apontar as falhas potenciais nessa lógica para você blindar sua arquitetura antes de escrever a primeira linha de código:
-
-A Ilusão da Coleta Imediata: Estamos assumindo que a ONG tem um carro abastecido e um motorista a postos o tempo todo. A realidade: A logística é demorada. A sua lógica de roteamento precisa cruzar a distância com o trânsito médio, senão o alimento estraga no porta-malas do voluntário.
-
-O Risco do "No-Show": O que acontece quando a ONG reserva e não aparece? O Doador fica frustrado e nunca mais usa o app. Seu sistema precisa de alertas escalonados. Se a ONG não validar o início da viagem em X minutos, a reserva deve cair automaticamente.
-
-O Problema do Banco de Dados Travado: Se você usar as transações padrão do banco de dados relacional para lidar com a concorrência na hora da reserva, um pico de acessos pode gerar deadlocks ou derrubar o banco. Você precisará pensar se usará filas em memória, estratégias de banco adequadas, ou se essa validação ocorrerá antes de bater no disco.
