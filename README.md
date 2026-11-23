@@ -99,6 +99,68 @@ Cria doadores, instituições e lotes em São Paulo, todos com a senha `resgatai
 
 Os lotes vencem em horas ou dias: rode de novo antes de uma demonstração.
 
+## Manual de utilização
+
+Acesse o app pelo navegador do celular ou do computador (em produção, https://3-222-213-101.sslip.io; local,
+http://localhost:3000). No celular, use *Adicionar à tela inicial* para instalar como app (PWA). Depois do login,
+cada perfil cai na sua tela inicial e navega pelas abas inferiores; o sino no topo abre as notificações.
+
+### Instituição (`ong@resgatai.demo` / `resgatai123`)
+
+1. **Cadastro**: em *Criar conta*, escolha Instituição e preencha CNPJ, contato e endereço. A conta fica *Em análise*
+   até o administrador aprovar (use `abrigo@resgatai.demo` para ver essa tela).
+2. **Lotes**: a aba *Lotes* mostra os lotes disponíveis perto do seu endereço, em *Lista* ou *Mapa*. Use a busca e
+   os *Filtros* (categoria, preço, vencimento, raio).
+3. **Reservar**: abra um lote, toque em *Reservar lote* e revise. Se o lote tiver preço simbólico, escolha *PIX* ou
+   *Cartão de crédito* (pagamento simulado). Na confirmação aparecem o QR Code e o PIN.
+4. **Retirar**: vá até o doador dentro do prazo e, em *Minhas reservas*, toque em *Mostrar QR Code e PIN* para ele
+   validar. Reserva não retirada expira e tira pontos de reputação.
+
+### Doador (`padaria@resgatai.demo` / `resgatai123`)
+
+1. **Cadastro**: em *Criar conta*, escolha Estabelecimento. O doador não precisa de aprovação.
+2. **Publicar**: na aba *Novo lote*, informe nome, categoria, quantidade, validade, janela de retirada, preço
+   (opcional) e foto, e toque em *Publicar lote*. As instituições próximas são notificadas.
+3. **Acompanhar**: a aba *Meus lotes* mostra o status de cada lote; *Repetir lote* abre o formulário preenchido com
+   os dados de um lote anterior.
+4. **Validar a retirada**: na aba *Validar*, leia o QR Code da instituição com a *Câmera* ou digite o *PIN*, toque em
+   *Conferir* e confira lote e instituição. Confirme a entrega (inteira ou parcial) ou use *Recusar entrega* com o
+   motivo, o que estorna o pagamento. Fora do prazo, marque *Autorizo a entrega fora do prazo*.
+
+### Administrador (`admin@resgatai.local` / `admin12345` em desenvolvimento)
+
+1. **Painel**: mostra os números da plataforma e a fila *Aguardando aprovação*. Em *Ver detalhes*, aprove ou rejeite
+   a instituição (a rejeição pede um motivo). Teste com `abrigo@resgatai.demo`.
+2. **Usuários**: busque por nome, perfil ou situação; cadastre um usuário novo (o link de primeiro acesso aparece na
+   tela quando não há e-mail configurado), edite os dados ou use *Inativar usuário*.
+3. **Auditoria**: a aba *Auditoria* lista as ações registradas (cadastros, aprovações, edições, inativações); o
+   histórico de cada usuário também aparece na página dele.
+
+## Testes
+
+```bash
+cd backend
+./mvnw verify            # H2 em memória, sem Docker nem rede
+```
+
+Os testes ficam em [`backend/src/test/java/resgatai`](backend/src/test/java/resgatai). São 48 testes de integração
+da API (Spring Boot + MockMvc, banco H2 desfeito a cada teste; geocodificação e e-mail simulados), 67 execuções
+no total porque o teste de concorrência entre validação e expiração roda 20 vezes. Cada teste descreve no `@DisplayName` o requisito ou o fluxo do caso de uso que cobre. Eles rodam a cada push no Jenkins (estágio
+*Backend: testes*), e o resultado fica na página *Test Result* do build; falha em teste interrompe o deploy.
+
+| Classe | O que cobre |
+|---|---|
+| `AuthControllerTest` | UC01: cadastro, dados inválidos (400), duplicidade (409), login, 401 sem token, admin inicial |
+| `UsuarioAdminControllerTest` | UC01 e RF06: acesso só de admin (401/403), CRUD de usuários, primeiro acesso, filtros, auditoria, inativação, aprovação/rejeição |
+| `LoteControllerTest` | UC02, RF02 e RF03: publicação, validações (400), endereço alternativo, foto, busca com filtros e raio, lotes encerrados fora da busca |
+| `ReservaControllerTest` | UC04: reserva com PIN/QR Code, lote já reservado (409), instituição pendente, lote fora da janela |
+| `ReservaConcorrenciaTest` | UC04 e UC06: reservas e validações simultâneas (lock pessimista), repetido 20 vezes |
+| `RetiradaControllerTest` | UC06: validação por QR Code e PIN, entrega parcial, código inválido, fora do prazo, cancelamento |
+| `ExpiracaoTest` | Worker de expiração: prazo de retirada, reserva expirada com penalidade, lote expirado |
+| `PagamentoTest` | RF04: PIX e cartão simulados, recusa (402), estorno em cancelamento, expiração e entrega parcial |
+| `NotificacaoTest` | CU03 e RF07: notificação por raio de urgência, caixa de entrada, envio por e-mail com fila |
+| `GeocodificadorTest` | Integração com o Nominatim: endereço encontrado, sem resultado (400) e serviço fora (503) |
+
 ## API
 
 | Endpoint | Acesso | Descrição |
